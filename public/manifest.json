@@ -1,0 +1,24 @@
+{
+  "name": "數獨演算法實驗室 (Sudoku Lab)",
+  "short_name": "數獨實驗室",
+  "description": "探索 Donald Knuth 的 X 演算法，並提供作答步數重播控制與數學科普的數獨平台。",
+  "start_url": "/ai-sudoku/",
+  "scope": "/ai-sudoku/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/ai-sudoku/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/ai-sudoku/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

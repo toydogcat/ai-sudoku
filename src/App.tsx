@@ -1412,12 +1412,20 @@ export default function App() {
       <footer className="mt-auto bg-slate-900 border-t border-slate-800 py-6 text-center text-xs text-slate-500" id="footer">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
           <p>© 2026 數獨演算法實驗室 (Sudoku Lab). Created with premium design values.</p>
-          <div className="flex justify-center gap-4 text-[11px] text-slate-500">
+          <div className="flex justify-center gap-4 text-[11px] text-slate-500 flex-wrap">
             <span>回溯法對角線快速生成</span>
             <span>•</span>
             <span>唯一解挖孔過濾</span>
             <span>•</span>
             <span>精確覆蓋與數對剪枝</span>
+            <span id="busuanzi_container_site_pv" style={{ display: 'none' }}>
+              <span>•</span>
+              <span>👁️ 總瀏覽量 <span id="busuanzi_value_site_pv" className="font-semibold text-slate-400"></span> 次</span>
+            </span>
+            <span id="busuanzi_container_site_uv" style={{ display: 'none' }}>
+              <span>•</span>
+              <span>👤 訪客數 <span id="busuanzi_value_site_uv" className="font-semibold text-slate-400"></span> 人</span>
+            </span>
           </div>
         </div>
       </footer>
