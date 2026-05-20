@@ -1,2 +1,4 @@
-# ai-sudoku
-數獨遊戲
+# AI Sudoku
+
+[數獨](https://toydogcat.github.io/ai-sudoku/)
+
