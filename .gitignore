@@ -10,3 +10,6 @@ coverage/
 # AI Sudoku Repository Overrides
 sudoku-game.zip
 metadata.json
+
+TMP/
+

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   RefreshCw, 
   Lightbulb, 
@@ -138,14 +138,83 @@ export default function App() {
     if (savedCookie) {
       try {
         const cookieMetaList = JSON.parse(savedCookie);
-        // If local storage was cleared but cookie remains, recover metadata references if possible
+        // If local storage was cleared but cookie remains, recover metadata references
         if (loadedHistory.length === 0 && cookieMetaList.length > 0) {
           console.log("Recovering basic stats from browser cookies");
+          loadedHistory = cookieMetaList.map((item: any) => ({
+            id: item.id,
+            timestamp: Date.now(),
+            dateString: item.dateString,
+            difficulty: item.difficulty,
+            elapsedTime: item.elapsedTime,
+            errorCount: 0,
+            initialGrid: Array.from({ length: 9 }, () => Array(9).fill(0)),
+            solutionGrid: Array.from({ length: 9 }, () => Array(9).fill(0)),
+            moves: Array.from({ length: item.movesCount || 0 }, () => ({ step: 0, row: 0, col: 0, value: 0 }))
+          }));
         }
       } catch(e) {}
     }
 
     setGameHistory(loadedHistory);
+
+    // 3. Restore last active live game progress from LocalStorage
+    const savedActive = localStorage.getItem('sudoku_active_live_record');
+    if (savedActive) {
+      try {
+        const { difficulty: savedDiff, initialGrid, moves } = JSON.parse(savedActive);
+        if (initialGrid && Array.isArray(moves)) {
+          const solverRes = solveSudoku(initialGrid);
+          const solution = solverRes.solution;
+          
+          if (solution) {
+            const restoredGrid: SudokuGrid = [];
+            for (let r = 0; r < 9; r++) {
+              const rowElements: Cell[] = [];
+              for (let c = 0; c < 9; c++) {
+                const val = initialGrid[r][c];
+                rowElements.push({
+                  row: r,
+                  col: c,
+                  value: val,
+                  original: val !== 0,
+                  candidates: [],
+                  pencilMarks: []
+                });
+              }
+              restoredGrid.push(rowElements);
+            }
+            
+            moves.forEach((move: Move) => {
+              const { row, col, value } = move;
+              if (row >= 0 && row < 9 && col >= 0 && col < 9) {
+                restoredGrid[row][col].value = value;
+                restoredGrid[row][col].pencilMarks = [];
+              }
+            });
+            
+            setDifficulty(savedDiff || 'easy');
+            setFullGrid(solution);
+            setSolutionGrid(solution);
+            setGrid(restoredGrid);
+            setSelectedCell(null);
+            setHint(null);
+            setErrorCount(0);
+            setWrongCells([]);
+            setGameWon(false);
+            setCurrentMoves(moves);
+            setGameStartedAt(Date.now());
+            setElapsedTime(0);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to restore saved live game from LocalStorage", e);
+      }
+    }
+
+    // Default fallback: Start a new game
+    startNewGame('easy');
   }, []);
 
   // Sync gameHistory state changes to LocalStorage and update reference Cookie
@@ -177,12 +246,12 @@ export default function App() {
     const updatedMoves = [...currentMoves, nextMove];
     setCurrentMoves(updatedMoves);
 
-    // Actively back up the current active moves sequence to custom live cookie so player never loses active work!
-    setCookie('sudoku_active_live_record', JSON.stringify({
+    // Actively back up the current active moves sequence to LocalStorage so player never loses active work!
+    localStorage.setItem('sudoku_active_live_record', JSON.stringify({
       difficulty,
       initialGrid: grid.map(r => r.map(c => c.original ? c.value : 0)),
       moves: updatedMoves
-    }), 1);
+    }));
   };
 
   // Initialize a new game
@@ -233,18 +302,15 @@ export default function App() {
     setGameStartedAt(Date.now());
     setElapsedTime(0);
 
-    // Initialise live cookie for this turn
-    setCookie('sudoku_active_live_record', JSON.stringify({
+    // Initialise live LocalStorage progress for this turn
+    localStorage.setItem('sudoku_active_live_record', JSON.stringify({
       difficulty: diff,
       initialGrid: puzzleSnapshot,
       moves: []
-    }), 1);
+    }));
   };
 
-  // Run on first mount
-  useEffect(() => {
-    startNewGame('easy');
-  }, []);
+
 
   // Timer loop
   useEffect(() => {
@@ -383,8 +449,10 @@ export default function App() {
       moves: [...currentMoves]
     };
 
-    // Save playing logs in cookies explicitly for the very latest replay!
-    setCookie('sudoku_latest_replay', JSON.stringify(newRecord), 15);
+    // Save playing logs in LocalStorage explicitly for the very latest replay!
+    localStorage.setItem('sudoku_latest_replay', JSON.stringify(newRecord));
+    // Clean up active live progress when game is successfully won
+    localStorage.removeItem('sudoku_active_live_record');
     
     // Add to multiple storage portfolio
     const updatedHistory = [newRecord, ...gameHistory];
@@ -499,8 +567,8 @@ export default function App() {
     });
   };
 
-  // Apply steps dynamically to construct visual matrix
-  const computeReplayMatrix = () => {
+  // Apply steps dynamically to construct visual matrix with useMemo to prevent redundant deep copies
+  const replayMatrix = useMemo(() => {
     if (!replayRecord) return Array.from({ length: 9 }, () => Array(9).fill(0));
     const matrix = replayRecord.initialGrid.map(row => [...row]);
     
@@ -512,9 +580,7 @@ export default function App() {
       }
     }
     return matrix;
-  };
-
-  const replayMatrix = computeReplayMatrix();
+  }, [replayRecord, replayCurrentStep]);
 
   // ---------------------------------------------------------------------------
   // JSON File Importer / Exporter (存 & 讀)
@@ -594,29 +660,31 @@ export default function App() {
     if (e.target) e.target.value = '';
   };
 
-  // Keyboard events listener
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!selectedCell || gameWon || isPlayingReplay) return;
-      
-      if (e.key >= '1' && e.key <= '9') {
-        handleNumberInput(parseInt(e.key));
-      } else if (e.key === 'Backspace' || e.key === 'Delete') {
-        handleClear();
-      } else if (e.key === 'ArrowUp') {
-        setSelectedCell(prev => prev ? { row: Math.max(0, prev.row - 1), col: prev.col } : null);
-      } else if (e.key === 'ArrowDown') {
-        setSelectedCell(prev => prev ? { row: Math.min(8, prev.row + 1), col: prev.col } : null);
-      } else if (e.key === 'ArrowLeft') {
-        setSelectedCell(prev => prev ? { row: prev.row, col: Math.max(0, prev.col - 1) } : null);
-      } else if (e.key === 'ArrowRight') {
-        setSelectedCell(prev => prev ? { row: prev.row, col: Math.min(8, prev.col + 1) } : null);
-      }
-    };
+  // Keyboard events listener - optimized to bind only once to prevent listener churn using Event Callback Ref
+  const handleKeyDownRef = useRef<any>(null);
+  handleKeyDownRef.current = (e: KeyboardEvent) => {
+    if (!selectedCell || gameWon || isPlayingReplay) return;
+    
+    if (e.key >= '1' && e.key <= '9') {
+      handleNumberInput(parseInt(e.key));
+    } else if (e.key === 'Backspace' || e.key === 'Delete') {
+      handleClear();
+    } else if (e.key === 'ArrowUp') {
+      setSelectedCell(prev => prev ? { row: Math.max(0, prev.row - 1), col: prev.col } : null);
+    } else if (e.key === 'ArrowDown') {
+      setSelectedCell(prev => prev ? { row: Math.min(8, prev.row + 1), col: prev.col } : null);
+    } else if (e.key === 'ArrowLeft') {
+      setSelectedCell(prev => prev ? { row: prev.row, col: Math.max(0, prev.col - 1) } : null);
+    } else if (e.key === 'ArrowRight') {
+      setSelectedCell(prev => prev ? { row: prev.row, col: Math.min(8, prev.col + 1) } : null);
+    }
+  };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedCell, grid, isNoteMode, gameWon, isPlayingReplay]);
+  useEffect(() => {
+    const listener = (e: KeyboardEvent) => handleKeyDownRef.current?.(e);
+    window.addEventListener('keydown', listener);
+    return () => window.removeEventListener('keydown', listener);
+  }, []);
 
   // Time Formatter
   const formatTime = (seconds: number) => {
@@ -624,6 +692,10 @@ export default function App() {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const wrongCellsSet = useMemo(() => {
+    return new Set(wrongCells.map(([wr, wc]) => `${wr}-${wc}`));
+  }, [wrongCells]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans relative" id="sudoku-app">
@@ -815,7 +887,7 @@ export default function App() {
                     // Hints & Validator matches
                     const isHintedCell = hint && hint.row === rIdx && hint.col === cIdx;
                     const isHintHighlight = hint && hint.highlightCells.some(([hr, hc]) => hr === rIdx && hc === cIdx);
-                    const isWrong = wrongCells.some(([wr, wc]) => wr === rIdx && wc === cIdx);
+                    const isWrong = wrongCellsSet.has(`${rIdx}-${cIdx}`);
 
                     let bgClass = "bg-slate-900 text-slate-100 hover:bg-slate-850/80";
                     if (isSelected) {

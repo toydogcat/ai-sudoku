@@ -95,10 +95,7 @@ function fillRemaining(grid: number[][], i: number, j: number): boolean {
     }
   }
 
-  for (let num = 1; num <= 9; num++) {
-    // We shuffle tries to introduce randomness
-    const randomNum = num; // Can be randomized but keeping simple loop shuffled or just serial works because box filling already randomizes
-  }
+
 
   // To maintain proper randomness, we can shuffle 1-9 for each cell
   const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -304,8 +301,7 @@ export function getNextStepHint(grid: number[][], solution: number[][]): HintRes
       const positiveCells: [number, number][] = [];
       for (let r = 0; r < 9; r++) {
         if (grid[r][c] === 0 && cellCandidates[r][c].includes(val)) {
-          positiveCells.push([r, r]); // Keep track of coordinates
-          positiveCells[positiveCells.length - 1] = [r, c];
+          positiveCells.push([r, c]);
         }
       }
       if (positiveCells.length === 1) {
