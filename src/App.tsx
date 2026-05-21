@@ -765,11 +765,10 @@ export default function App() {
           <div className="relative p-1.5 bg-slate-900 rounded-2xl shadow-2xl w-full max-w-[460px] border border-slate-800" id="sudoku-grid-wrapper">
             <div className="grid grid-cols-9 gap-[1px] bg-slate-950 overflow-hidden rounded-xl border-2 border-slate-950" style={{ transform: 'translate3d(0, 0, 0)' }}>
               
-              {/* Conditional rendering depending on Replay state vs live state */}
               {isPlayingReplay ? (
                 // Replay View Generation
-                replayMatrix.map((val, rIdx) => 
-                  Array.from({ length: 9 }).map((_, cIdx) => {
+                replayMatrix.map((row, rIdx) => 
+                  row.map((val, cIdx) => {
                     const isOriginal = replayRecord?.initialGrid[rIdx][cIdx] !== 0;
                     const lastMove = replayRecord?.moves[replayCurrentStep - 1];
                     const isNewestChange = lastMove && lastMove.row === rIdx && lastMove.col === cIdx;
